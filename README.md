@@ -1,36 +1,279 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EOVO
 
-## Getting Started
+**EOVO** 是一个 AI 场景演绎平台。
 
-First, run the development server:
+在 EOVO 中，每一张卡片不是一个故事，而是一个 **舞台（Scene）**。
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+用户可以进入一个场景，选择其中发生的事件，然后把生成的提示词发送给自己的 AI（Gemini / ChatGPT / 豆包 等），由 AI 继续演绎剧情。
+
+EOVO 不生成故事，它提供 **舞台与开场**。
+
+---
+
+# 核心理念
+
+传统的 AI 角色扮演通常围绕：
+
+```
+角色
+prompt
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+而 EOVO 的结构是：
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+Scene（舞台）
+↓
+Episode（事件）
+↓
+AI 演绎
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+每个 Scene 都是一个 **可以无限发生故事的舞台**。
 
-## Learn More
+例如：
 
-To learn more about Next.js, take a look at the following resources:
+```
+谢尔顿公寓
+同福客栈
+大观园
+赛博朋克夜之城
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+在这些舞台上，可以触发不同事件：
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+霍华德发明失败
+室友协议争论
+吕秀才智斗姬无命
+林黛玉葬花
+```
 
-## Deploy on Vercel
+用户可以选择事件，然后把 Prompt 发送给 AI，让故事继续展开。
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# 产品结构
+
+```
+首页
+↓
+Scene 卡片
+↓
+进入 Scene
+↓
+Episode 列表
+↓
+复制 Prompt
+↓
+发送给 AI
+↓
+剧情演绎
+```
+
+EOVO 本身不运行 AI 推理，因此：
+
+```
+零 AI 成本
+零后端依赖
+```
+
+系统只负责：
+
+```
+场景收集
+剧情触发
+Prompt 生成
+```
+
+---
+
+# 技术栈
+
+当前版本使用：
+
+```
+Next.js
+React
+TypeScript
+JSON 数据源
+```
+
+项目特点：
+
+```
+无数据库
+无后端
+纯静态数据驱动
+```
+
+未来计划支持：
+
+```
+10万+ Scene 卡片
+```
+
+---
+
+# 项目结构
+
+```
+EOVO
+│
+├ app
+│ ├ page.tsx
+│ ├ scene
+│ │ └ [id]
+│ │     └ page.tsx
+│
+├ public
+│ └ data
+│     └ scenes.json
+│
+├ globals.css
+├ layout.tsx
+├ README.md
+```
+
+---
+
+# Scene 数据结构
+
+Scene 是系统的核心单位。
+
+示例：
+
+```json
+{
+  "id": "scene_sheldon_apartment",
+  "name": "谢尔顿公寓",
+  "world": "The Big Bang Theory",
+  "description": "位于加州理工附近的一套公寓，客厅中央摆着谢尔顿固定的沙发座位。",
+  "characters": [
+    "谢尔顿",
+    "莱纳德",
+    "霍华德",
+    "拉杰",
+    "佩妮"
+  ],
+  "episodes": [
+    {
+      "title": "霍华德展示新发明却在客厅爆炸",
+      "opening": "霍华德抱着一个冒烟的金属装置冲进客厅。"
+    }
+  ]
+}
+```
+
+---
+
+# Prompt 结构
+
+当用户选择 Episode 后，系统会生成 Prompt：
+
+```
+世界：
+The Big Bang Theory
+
+场景：
+谢尔顿公寓
+
+人物：
+谢尔顿、莱纳德、霍华德
+
+事件：
+霍华德展示新发明却在客厅爆炸
+
+开场：
+霍华德抱着一个冒烟的金属装置冲进客厅。
+
+请继续演绎这个场景。
+```
+
+用户可以发送到：
+
+```
+Gemini
+ChatGPT
+豆包
+```
+
+进行剧情演绎。
+
+---
+
+# 当前开发阶段
+
+项目目前处于：
+
+```
+MVP 原型阶段
+```
+
+已经实现：
+
+```
+Scene 数据结构
+动态路由
+Scene 页面
+Episode Prompt 复制
+```
+
+接下来重点开发：
+
+```
+Scene 卡片 UI
+首页浏览体验
+场景索引系统
+```
+
+---
+
+# 设计目标
+
+EOVO 的 UI 希望呈现一种 **文学舞台入口的感觉**。
+
+卡片结构类似：
+
+```
+『雨水顺着生锈的管道滴落，
+远处的全息广告牌闪烁着幽蓝的光。』
+
+2077 · 夜之城 · 霓虹暗巷
+```
+
+用户点击卡片，即进入一个可以发生故事的舞台。
+
+---
+
+# 未来计划
+
+未来 EOVO 可能扩展为：
+
+```
+世界图书馆
+剧情舞台索引
+AI演绎入口
+```
+
+每一张卡片代表：
+
+```
+一个时间线
+一个世界
+一个舞台
+```
+
+用户可以在这些舞台中：
+
+```
+观看故事
+参与剧情
+重新演绎经典场景
+```
+
+---
+
+# License
+
+MIT License

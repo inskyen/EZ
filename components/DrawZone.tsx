@@ -54,7 +54,7 @@ export default function DrawZone() {
           </svg>
           
           <h2 className="text-white text-[20px] tracking-[0.5em] font-light mb-12 opacity-80 z-10">
-            未 曾 约 定 地
+            陌 生 来 信
           </h2>
 
           <div 

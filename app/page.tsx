@@ -1,65 +1,191 @@
-import Image from "next/image";
+"use client";
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import SceneCard from '../components/SceneCard';
+import DrawZone from '../components/DrawZone'; // 👈 1. 召唤抽卡大厅组件
+import scenesData from '../public/data/scenes.json';
+
+const PAGE_SIZE = 5;
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+  // ==========================================
+  // 1. 三界坐标系 (核心魔法：控制当前显示的平行位面)
+  // 0: 抽卡 | 1: 发现 (默认) | 2: 分区
+  // ==========================================
+  const [activeTab, setActiveTab] = useState(1); 
+
+  // 2. 发现页 (瀑布流) 状态
+  const [items, setItems] = useState<typeof scenesData>([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // 3. 物理触摸引擎状态
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullY, setPullY] = useState(0); 
+  const [dragX, setDragX] = useState(0); // 记录手指横向拉扯的像素位移
+  const [isDragging, setIsDragging] = useState(false); // 标记当前是否正在被手指按住
+  const touchStartPos = useRef({ x: 0, y: 0 });
+  const touchEndPos = useRef({ x: 0, y: 0 });
+  const loaderRef = useRef<HTMLDivElement>(null);
+  // 👇 新增：用于探测发现页自己滚动到了哪里的探测仪 👇
+  const discoverScrollRef = useRef<HTMLDivElement>(null);
+
+  // 初始化发现页数据
+  useEffect(() => {
+    setItems(scenesData.slice(0, PAGE_SIZE));
+  }, []);
+
+  // 懒加载引擎 (仅在发现页有效)
+  const loadMore = useCallback(() => {
+    if (activeTab !== 1 || isLoading || isRefreshing || !hasMore) return;
+    setIsLoading(true);
+    setTimeout(() => {
+      const currentLength = items.length;
+      const nextItems = scenesData.slice(currentLength, currentLength + PAGE_SIZE);
+      if (nextItems.length > 0) setItems(prev => [...prev, ...nextItems]);
+      if (currentLength + PAGE_SIZE >= scenesData.length) setHasMore(false);
+      setIsLoading(false);
+    }, 800);
+  }, [activeTab, items.length, isLoading, isRefreshing, hasMore]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) loadMore();
+    }, { threshold: 0.1 });
+    if (loaderRef.current) observer.observe(loaderRef.current);
+    return () => observer.disconnect();
+  }, [loadMore]);
+
+// ==========================================
+  // 4. 终极物理触摸引擎 (跟手阻尼 + 位面穿梭 + 下拉刷新)
+  // ==========================================
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    touchEndPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    setIsDragging(true); // 👇 核心魔法：手指按下，剥夺 CSS 动画权柄！
+  };
+
+const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    const diffY = touchEndPos.current.y - touchStartPos.current.y;
+    const diffX = touchEndPos.current.x - touchStartPos.current.x;
+
+    // 获取发现页局部的滚动高度
+    const scrollTop = discoverScrollRef.current?.scrollTop || 0;
+
+    if (Math.abs(diffX) > Math.abs(diffY)) {
+      let allowedDragX = diffX;
+      if (activeTab === 0 && diffX > 0) allowedDragX = diffX / 3;
+      if (activeTab === 2 && diffX < 0) allowedDragX = diffX / 3;
+      setDragX(allowedDragX);
+    } 
+    // 👇 核心修复：将 window.scrollY 换成了局部的 scrollTop 👇
+    else if (activeTab === 1 && diffY > 0 && scrollTop <= 0) {
+      setPullY(Math.min(diffY / 2.5, 80)); 
+    }
+  };
+  const handleTouchEnd = () => {
+    setIsDragging(false); // 👇 核心魔法：手指松开，交还 CSS 动画权柄！
+
+    // 判定 1：横向跃迁 (拉扯超过 60px 就判定为您想翻页)
+    if (Math.abs(dragX) > 60) {
+      if (dragX > 0 && activeTab > 0) {
+        setActiveTab(prev => prev - 1); // 向右拉，去左边的位面
+      } else if (dragX < 0 && activeTab < 2) {
+        setActiveTab(prev => prev + 1); // 向左拉，去右边的位面
+      }
+    }
+    setDragX(0); // 无论是否翻页，拉拽变量瞬间清零，让底盘自己滑动归位
+
+    // 判定 2：纵向下拉刷新
+    if (activeTab === 1 && pullY > 55) {
+      setIsRefreshing(true);
+      setPullY(55); 
+      setTimeout(() => {
+        const shuffled = [...scenesData].sort(() => 0.5 - Math.random());
+        setItems(shuffled.slice(0, PAGE_SIZE));
+        setHasMore(true);
+        setIsRefreshing(false);
+        setPullY(0); 
+      }, 1000); 
+    } else {
+      setPullY(0);
+    }
+  };
+return (
+    /* 👇 核心魔法 1：main 被死死钉住，高度等于手机屏幕 (100dvh)，彻底掐断全局滚动 👇 */
+    <main className="h-[100dvh] w-screen bg-[#f5f6f8] font-sans overflow-hidden flex flex-col">
+      
+      {/* 顶部苍穹导航 (作为 Flex 的头部，极其自然地永远悬浮在顶端) */}
+      <header className="flex-none bg-white/95 backdrop-blur-md border-b border-gray-100 px-5 py-3.5 flex items-center z-50">
+        <div className="flex-1 flex justify-start">
+          <div className="text-[19px] tracking-[0.2em] text-[#4a3570] font-light">EOVO</div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="flex-none flex space-x-7 text-[15px]">
+          {['抽卡', '发现', '分区'].map((tabName, index) => (
+            <div key={index} className="relative cursor-pointer flex flex-col items-center" onClick={() => setActiveTab(index)}>
+              <span className={activeTab === index ? "text-gray-900 font-bold" : "text-gray-500"}>{tabName}</span>
+              {activeTab === index && <div className="absolute -bottom-[6px] w-[14px] h-[3px] bg-[#4a3570] rounded-full transition-all"></div>}
+            </div>
+          ))}
         </div>
-      </main>
-    </div>
+        <div className="flex-1 flex justify-end text-gray-400">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+        </div>
+      </header>
+      
+      {/* 下拉刷新指示器 (固定在胶卷轨道上方，避免被滚动带走) */}
+      <div className="absolute w-full flex justify-center items-center text-[#4a3570] text-[13px] font-medium z-0" style={{ height: '55px', top: '55px', opacity: pullY / 55 }}>
+        {isRefreshing ? '星轨重构中...' : (pullY > 55 ? '松开降临新世界' : '下拉探索星海')}
+      </div>
+
+      {/* ==========================================
+          滑动胶卷轨道：占据屏幕剩余的所有高度 (flex-1)
+          并且将 Touch 事件只挂载在轨道上，避免干扰导航栏
+          ========================================== */}
+      <div 
+        className="flex-1 min-h-0 w-full relative z-10 flex" 
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* 👇 顺手把这里的 h-full 删掉（因为父级变成 flex 后，它会自动完美撑满高度） 👇 */}
+        <div 
+          className={`flex w-[300vw] ${isDragging ? '' : 'transition-transform duration-300 ease-out'}`}
+          style={{ transform: `translateX(calc(-${activeTab * 100}vw + ${dragX}px))` }}
+        >
+          
+          {/* 👇 核心魔法 2：三个位面各自拥有 h-full 和 overflow-y-auto，滚动彻底独立 👇 */}
+
+          {/* 位面 0：抽卡大厅 */}
+          <div className="w-[100vw] h-full overflow-y-auto shrink-0 flex flex-col items-center justify-center text-gray-400 pb-20 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {/* 👈 2. 直接将组件安放在这里！原本的占位文字被替换了 */}
+            <DrawZone />
+          </div>
+
+          {/* 位面 1：发现页 (挂载探测仪 discoverScrollRef) */}
+          <div 
+            ref={discoverScrollRef}
+            className="w-[100vw] h-full overflow-y-auto shrink-0 relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          >
+            <div className="max-w-md mx-auto px-4 pt-4 relative z-10" style={{ transform: `translateY(${pullY}px)`, transition: pullY === 0 || isRefreshing ? 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)' : 'none' }}>
+              {items.map((scene, index) => (
+                <SceneCard key={`${scene.id}-${index}`} name={scene.name} world={scene.world} description={scene.description} />
+              ))}
+              <div ref={loaderRef} className="py-6 flex justify-center items-center text-gray-400 text-[13px]">
+                {isLoading ? <span className="flex items-center space-x-2"><svg className="animate-spin h-4 w-4 text-[#4a3570]" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>正在连接深空节点...</span></span> : !hasMore ? <span className="text-gray-300">— 宇宙边界已至 —</span> : null}
+              </div>
+            </div>
+          </div>
+
+          {/* 位面 2：奇物档案馆 */}
+          <div className="w-[100vw] h-full overflow-y-auto shrink-0 flex flex-col items-center justify-center text-gray-400 pb-20 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="text-4xl mb-4">🏛️</div>
+            <p className="text-[15px] tracking-widest">奇物档案馆正在接入...</p>
+          </div>
+
+        </div>
+      </div>
+    </main>
   );
 }
