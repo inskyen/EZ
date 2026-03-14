@@ -237,7 +237,8 @@ export default function Home() {
           <div 
             ref={discoverScrollRef}
             onScroll={handleScroll} // ✨ 引擎皮带在这里完美连接！
-            className="w-[100vw] h-full overflow-y-auto shrink-0 relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            // 👇 ✨ 核心防御：加上 overscroll-y-none，彻底掐断浏览器的原生下拉刷新！
+            className="w-[100vw] h-full overflow-y-auto overscroll-y-none shrink-0 relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           >
             <div className="max-w-md mx-auto px-4 pt-4 relative z-10" style={{ transform: `translateY(${pullY}px)`, transition: pullY === 0 || isRefreshing ? 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)' : 'none' }}>
               
