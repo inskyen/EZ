@@ -125,6 +125,15 @@ export default function Home() {
     touchEndPos.current = pos;
     dragDirection.current = null; 
     setIsDragging(true); 
+
+    // 👇 ✨ 终极黑魔法：1px 欺骗战术 ✨ 👇
+    // 只要是在发现页，且手指按下的瞬间发现它停在绝对顶部 (0)
+    if (activeTab === 1 && discoverScrollRef.current) {
+      if (discoverScrollRef.current.scrollTop <= 0) {
+        // 悄悄把它往下推一点点 (1px 即可破局，肉眼完全看不见，却能完美骗过浏览器)
+        discoverScrollRef.current.scrollTop = 1; 
+      }
+    }
   };
 
   const handleDragMove = (e: any) => {
