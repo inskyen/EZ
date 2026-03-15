@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 // ✨ 核心 SEO 魔法：世界真名与宇宙引力
 export const metadata: Metadata = {
-  title: "EOVO · 地球原影",
+  title: "EOVO采样器",
   description: "人间剪影的数字档案馆。收录文明切片，记录奇物异景，是浩瀚世界的观察者。Earth's Original Visual Observer.",
   keywords: ["EOVO", "地球原影", "奇物档案", "文明切片", "人间剪影", "世界观察", "数字档案"],
   icons: {
